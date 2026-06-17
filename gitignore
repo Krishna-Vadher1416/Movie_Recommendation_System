@@ -1,3 +1,5 @@
-venv
-similarity.pkl
+# Ignore large model files
 *.pkl
+
+# Ignore virtual environment
+.venv/
