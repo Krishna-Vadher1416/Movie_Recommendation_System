@@ -1,7 +1,20 @@
+
 import streamlit as st
 import pickle
 import pandas as pd
 import requests
+from sklearn.metrics.pairwise import cosine_similarity
+
+movies_dict = pickle.load(open('movies_dict.pkl','rb'))
+movies = pd.DataFrame(movies_dict)
+
+vectors = pickle.load(open('movies.pkl','rb'))
+
+@st.cache_data
+def compute_similarity(vectors):
+    return cosine_similarity(vectors)
+
+similarity = compute_similarity(vectors)
 
 # ---------------- PAGE CONFIG ----------------
 st.set_page_config(page_title="Movie Recommender", layout="wide")
@@ -118,9 +131,6 @@ def recommend(movie, selected_genre):
 
     return names, posters, overviews, ratings, dates
 # ---------------- LOAD DATA ----------------
-movies_dict = pickle.load(open('movies_dict.pkl', 'rb'))
-movies = pd.DataFrame(movies_dict)
-similarity = pickle.load(open('similarity.pkl', 'rb'))
 
 all_genres = set()
 
