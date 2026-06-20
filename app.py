@@ -5,19 +5,32 @@ import pandas as pd
 import requests
 from sklearn.metrics.pairwise import cosine_similarity
 from sklearn.feature_extraction.text import CountVectorizer
-
-movies_dict = pickle.load(open('movies_dict.pkl','rb'))
-movies = pd.DataFrame(movies_dict)
-
-similarity = pickle.load(open('movies.pkl','rb'))
-
-import ast
-
-movies['genres'] = movies['genres'].apply(lambda x: ast.literal_eval(x) if isinstance(x, str) else x)
-movies['genres'] = movies['genres'].apply(lambda x: [i['name'] for i in x])
-
 import os
-API_KEY = os.getenv("5d3e9c7f397530f090373c398cac5f74")
+
+
+def download_file(url, filename):
+    # If already downloaded → skip
+    if not os.path.exists(filename):
+        print(f"Downloading {filename}...")
+
+        response = requests.get(url, stream=True)
+        with open(filename, "wb") as f:
+            for chunk in response.iter_content(1024):
+                if chunk:
+                    f.write(chunk)
+
+        print(f"{filename} downloaded!")
+
+    else:
+        print(f"{filename} already exists. Skipping download.")
+
+    return pickle.load(open(filename, "rb"))
+
+movies_url = "https://www.dropbox.com/scl/fi/5q3m535h1iy2s33798qcy/movies.pkl?rlkey=6m7mw3v2f08ftmafdm8ng71qr&st=fxdvo14h&dl=1"
+
+similarity_url = "https://www.dropbox.com/scl/fi/cr9l16g9mgfqy3amgzypj/similarity.pkl?rlkey=ezccgy3qi0ghj1poerhn0jpm5&st=gz5rs3bt&dl=1"
+
+API_KEY = "5d3e9c7f397530f090373c398cac5f74"
 
 # ---------------- PAGE CONFIG ----------------
 st.set_page_config(page_title="Movie Recommender", layout="wide")
@@ -82,16 +95,32 @@ st.markdown('<div class="sub-text">Find movies you will love ❤️</div>', unsa
 
 
 # ---------------- FUNCTION ----------------
+
 @st.cache_data
+def load_data():
+    with st.spinner("Downloading and loading data... ⏳ (first time only)"):
+        movies = download_file(movies_url, "movies.pkl")
+        similarity = download_file(similarity_url, "similarity.pkl")
+    return movies, similarity
+movies, similarity = load_data()
 
-
+@st.cache_data
 def fetch_movie_details(movie_id):
     try:
         url = f"https://api.themoviedb.org/3/movie/{movie_id}?api_key={API_KEY}"
         response = requests.get(url)
+
+        if response.status_code != 200:
+            print("API ERROR:", response.status_code)
+            return "https://via.placeholder.com/500x750?text=Error", "Error", "N/A", "N/A"
+
         data = response.json()
 
-        poster = "https://image.tmdb.org/t/p/w500/" + data['poster_path'] if data.get('poster_path') else "https://via.placeholder.com/500x750?text=No+Image"
+        poster = (
+            "https://image.tmdb.org/t/p/w500/" + data['poster_path']
+            if data.get('poster_path')
+            else "https://via.placeholder.com/500x750?text=No+Image"
+        )
 
         overview = data.get('overview', "No overview available")
         rating = data.get('vote_average', "N/A")
@@ -99,8 +128,9 @@ def fetch_movie_details(movie_id):
 
         return poster, overview, rating, release_date
 
-    except:
-        return None, "Error", "N/A", "N/A"
+    except Exception as e:
+        print("ERROR:", e)
+        return "https://via.placeholder.com/500x750?text=Error", "Error", "N/A", "N/A"
 
 def recommend(movie, selected_genre):
     movie_index = movies[movies['title'] == movie].index[0]
@@ -116,7 +146,7 @@ def recommend(movie, selected_genre):
 
         # 🔥 FILTER LOGIC
         if selected_genre != "All":
-            if selected_genre not in movie_data['genres']:
+            if selected_genre.lower() not in movie_data['tags'].lower():
                 continue
 
         movie_id = movie_data.movie_id
@@ -137,12 +167,23 @@ def recommend(movie, selected_genre):
 
 all_genres = set()
 
-for genres in movies['genres']:
-    for g in genres:   # because it's already a list
-        all_genres.add(g)
+# Extract genres from tags (basic keywords)
+possible_genres = [
+    "action", "comedy", "drama", "romance",
+    "thriller", "horror", "adventure",
+    "animation", "fantasy", "crime"
+]
+
+for tag_string in movies['tags']:
+    tag_string = tag_string.lower()
+    for g in possible_genres:
+        if g in tag_string:
+            all_genres.add(g.capitalize())
 
 all_genres = sorted(list(all_genres))
-# ----------------Top Trending Movies ----------------
+
+
+# ---------------- Top Trending Movies ----------------
 st.markdown("## 🔥 Trending Movies")
 
 trending_movies = movies.iloc[0:5]
@@ -156,17 +197,12 @@ for i, col in enumerate(cols):
         st.image(poster)
         st.caption(trending_movies.iloc[i]['title'])
         st.write(f"⭐ {rating}")
+
+
 # ---------------- SELECT BOX ----------------
 
 selected_movie = st.selectbox("🔍 Search a movie", movies['title'].values)
 
-all_genres = set()
-
-for genres in movies['genres']:
-    for g in genres:   # because it's already a list
-        all_genres.add(g)
-
-all_genres = sorted(list(all_genres))
 
 # ---------------- SIDEBAR FILTER ----------------
 st.sidebar.header("🎯 Filters")
@@ -175,6 +211,7 @@ selected_genre = st.sidebar.selectbox(
     "Select Genre",
     ["All"] + all_genres
 )
+
 
 # ---------------- BUTTON ----------------
 if st.button("🎯 Recommend"):
@@ -196,4 +233,6 @@ if st.button("🎯 Recommend"):
 
             with st.expander("📖 Overview"):
                 st.write(overviews[i])
+
+
 
