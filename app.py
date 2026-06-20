@@ -6,6 +6,9 @@ import requests
 from sklearn.metrics.pairwise import cosine_similarity
 from sklearn.feature_extraction.text import CountVectorizer
 import os
+def load_pickle(url):
+    response = requests.get(url)
+    return pickle.loads(response.content)
 
 
 def download_file(url, filename):
