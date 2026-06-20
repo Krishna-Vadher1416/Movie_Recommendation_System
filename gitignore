@@ -3,3 +3,6 @@
 
 # Ignore virtual environment
 .venv/
+
+movies.pkl
+similarity.pkl

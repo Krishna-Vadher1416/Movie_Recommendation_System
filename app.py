@@ -4,17 +4,20 @@ import pickle
 import pandas as pd
 import requests
 from sklearn.metrics.pairwise import cosine_similarity
+from sklearn.feature_extraction.text import CountVectorizer
 
 movies_dict = pickle.load(open('movies_dict.pkl','rb'))
 movies = pd.DataFrame(movies_dict)
 
-vectors = pickle.load(open('movies.pkl','rb'))
+similarity = pickle.load(open('movies.pkl','rb'))
 
-@st.cache_data
-def compute_similarity(vectors):
-    return cosine_similarity(vectors)
+import ast
 
-similarity = compute_similarity(vectors)
+movies['genres'] = movies['genres'].apply(lambda x: ast.literal_eval(x) if isinstance(x, str) else x)
+movies['genres'] = movies['genres'].apply(lambda x: [i['name'] for i in x])
+
+import os
+API_KEY = os.getenv("5d3e9c7f397530f090373c398cac5f74")
 
 # ---------------- PAGE CONFIG ----------------
 st.set_page_config(page_title="Movie Recommender", layout="wide")
@@ -84,7 +87,7 @@ st.markdown('<div class="sub-text">Find movies you will love ❤️</div>', unsa
 
 def fetch_movie_details(movie_id):
     try:
-        url = f"https://api.themoviedb.org/3/movie/{movie_id}?api_key=5d3e9c7f397530f090373c398cac5f74"
+        url = f"https://api.themoviedb.org/3/movie/{movie_id}?api_key={API_KEY}"
         response = requests.get(url)
         data = response.json()
 
